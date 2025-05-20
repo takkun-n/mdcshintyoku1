@@ -11,6 +11,8 @@ const Settings: React.FC = () => {
   const [clearConfirm, setClearConfirm] = useState(false);
   const [productImportSuccess, setProductImportSuccess] = useState(false);
   const [productImportError, setProductImportError] = useState('');
+  const [processImportSuccess, setProcessImportSuccess] = useState(false);
+  const [processImportError, setProcessImportError] = useState('');
   
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('products');
@@ -82,7 +84,7 @@ const Settings: React.FC = () => {
         
         for (let i = 0; i < lines.length; i++) {
           const code = lines[i].trim();
-          if (!code) continue; // Skip empty lines
+          if (!code) continue;
           
           if (existingCodes.has(code)) {
             setProductImportError(`商品コード "${code}" は既に存在します`);
@@ -107,6 +109,56 @@ const Settings: React.FC = () => {
       } catch (error) {
         console.error('Product import error:', error);
         setProductImportError('データの読み込み中にエラーが発生しました');
+        event.target.value = '';
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
+  const handleProcessFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setProcessImportSuccess(false);
+    setProcessImportError('');
+    
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const lines = content.split(/\r?\n/);
+        const newProcesses: Process[] = [];
+        const existingNames = new Set(processes.map(p => p.name));
+        
+        for (let i = 0; i < lines.length; i++) {
+          const name = lines[i].trim();
+          if (!name) continue;
+          
+          if (existingNames.has(name)) {
+            setProcessImportError(`工程名 "${name}" は既に存在します`);
+            return;
+          }
+          
+          newProcesses.push({
+            id: crypto.randomUUID(),
+            name: name
+          });
+          existingNames.add(name);
+        }
+        
+        if (newProcesses.length === 0) {
+          setProcessImportError('有効な工程名が見つかりませんでした');
+          return;
+        }
+        
+        setProcesses(prevProcesses => [...prevProcesses, ...newProcesses]);
+        setProcessImportSuccess(true);
+        event.target.value = '';
+      } catch (error) {
+        console.error('Process import error:', error);
+        setProcessImportError('データの読み込み中にエラーが発生しました');
         event.target.value = '';
       }
     };
@@ -312,6 +364,38 @@ const Settings: React.FC = () => {
 
             <div className="bg-white p-6 rounded-lg shadow-lg border border-blue-100">
               <h2 className="text-xl font-bold mb-4 text-blue-900">工程マスター</h2>
+              
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">工程名の一括インポート</h3>
+                <div className="flex items-center gap-2">
+                  <label className="flex-1">
+                    <div className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 
+                      transition duration-200 flex items-center justify-center gap-2 cursor-pointer">
+                      <FileSpreadsheet size={18} />
+                      CSVファイルを選択
+                      <input
+                        type="file"
+                        accept=".csv,.txt"
+                        onChange={handleProcessFileImport}
+                        className="hidden"
+                      />
+                    </div>
+                  </label>
+                </div>
+                {processImportSuccess && (
+                  <p className="text-green-600 text-sm mt-2">
+                    工程名を正常にインポートしました。
+                  </p>
+                )}
+                {processImportError && (
+                  <p className="text-red-600 text-sm mt-2">
+                    {processImportError}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  1行に1つの工程名が記載されたCSVファイルをアップロードしてください。
+                </p>
+              </div>
               
               <div className="flex gap-2 mb-4">
                 <input
